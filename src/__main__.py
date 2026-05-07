@@ -6,89 +6,6 @@ from typing import Any
 import re
 
 
-# # ── 1. SETUP ──────────────────────────────────────────────
-
-# functions = json.loads(Path("data/input/functions_definition.json").read_text())
-# prompts = json.loads(Path("data/input/function_calling_tests.json").read_text())
-
-# model = Small_LLM_Model()
-
-# vocab_raw = json.loads(Path(model.get_path_to_vocab_file()).read_text())
-# vocab = {k: v for k, v in vocab_raw.items()}   # id  → "fn_add"
-# reverse_vocab = {v: k for k, v in vocab.items()}    # "fn_add" → id
-
-# function_names = [f["name"] for f in functions]
-
-
-# # ── 2. HELPERS ────────────────────────────────────────────
-
-# def build_prompt(user_prompt: str) -> str:
-#     fn_list = "\n".join(f"- {f['name']}: {f['description']}" for f in functions)
-#     return (
-#         f"Available functions:\n{fn_list}\n\n"
-#         f"User request: {user_prompt}\n\n"
-#         f"Response JSON:"
-#     )
-
-
-# def get_valid_ids(generated_so_far: list[int]) -> list[int]:
-#     """TODO: retourner les token IDs valides selon l'état courant du JSON."""
-#     # Hint : utilise ton trie pour la phase 1 (nom de fonction)
-#     # et les types de paramètres pour la phase 2
-#     raise NotImplementedError
-
-
-# def is_complete(generated_so_far: list[int]) -> bool:
-#     """TODO: retourner True quand le JSON est terminé (accolade fermante finale)."""
-#     text = model.decode(generated_so_far)
-#     return text.strip().endswith("}")
-
-
-# # ── 3. BOUCLE DE GÉNÉRATION ───────────────────────────────
-
-# def generate(prompt: str) -> dict:
-#     input_ids: list[int] = model.encode(prompt)[0].tolist()
-#     generated: list[int] = []
-
-#     for _ in range(200):                                    # max 200 tokens
-#         logits = model.get_logits_from_input_ids(input_ids)
-#         logits_np = np.array(logits)
-
-#         valid = get_valid_ids(generated)
-#         if not valid:
-#             break
-
-#         mask = np.full(len(logits_np), float("-inf"))
-#         mask[valid] = logits_np[valid]                      # garder seulement les valides
-
-#         next_token = int(np.argmax(mask))
-#         input_ids.append(next_token)
-#         generated.append(next_token)
-
-#         if is_complete(generated):
-#             break
-
-#     return json.loads(model.decode(generated))
-
-
-# # ── 4. PIPELINE ───────────────────────────────────────────
-
-# results = []
-# for entry in prompts:
-#     result = generate(build_prompt(entry["prompt"]))
-#     results.append({
-#         "prompt":     entry["prompt"],
-#         "name":       result["name"],
-#         "parameters": result["parameters"],
-#     })
-
-# Path("data/output").mkdir(parents=True, exist_ok=True)
-# Path("data/output/function_calls.json").write_text(
-#     json.dumps(results, indent=2)
-# )
-# print(f"Done — {len(results)} résultats écrits.")
-
-
 functions = json.loads(Path("data/input/functions_definition.json").read_text())
 prompts = json.loads(Path("data/input/function_calling_tests.json").read_text())
 function_names = [f["name"] for f in functions]
@@ -200,4 +117,5 @@ for entry in prompts:
         "name": function_name,
         "parameters": parameters
     })
-print(results)
+for result in results:
+    print(json.dumps(result, indent=2))
