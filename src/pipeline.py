@@ -1,28 +1,16 @@
 from pathlib import Path
-
 from .parser import load_json_file
+from .pydantic_models import PromptData
 
 
-def process_prompts(
-    input_path: Path,
-    functions_path: Path,
-) -> list[dict[str, object]]:
-    """Load inputs and build placeholder results."""
-    prompts = load_json_file(input_path)
-    load_json_file(functions_path)
+def run_pipeline(json_path: Path) -> None:
+    try:
+        raw_data = load_json_file(json_path)
+        prompt_data = PromptData.model_validate(raw_data)
+        print(f"Prompt: {prompt_data.prompt}")
+    except ValueError as exc:
+        print(f"Erreur lors du chargement du fichier JSON: {exc}")
+    except Exception as exc:
+        print(f"Erreur inattendue: {exc}")
 
-    results: list[dict[str, object]] = []
-    for item in prompts:
-        prompt_text = item["prompt"]
 
-        # Ici, tu appelleras le LLM pour choisir la fonction + arguments
-        # puis tu valideras la sortie avec Pydantic.
-        results.append(
-            {
-                "prompt": prompt_text,
-                "chosen_function": "exemple_fonction",
-                "arguments": {},
-            }
-        )
-
-    return results
