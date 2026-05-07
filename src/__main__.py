@@ -21,13 +21,13 @@ def is_token_valid(current_prompt: str, token_str: str, functions: list[str]) ->
     return False
 
 
-def best_valid_token(logits_np: np.ndarray, current_text: str, candidates: list[str]) -> tuple[int, str]:
+def best_valid_token(logits_np: np.ndarray, current_text: str, function_names: list[str]) -> tuple[int, str]:
     logits = logits_np.copy()
     for _ in range(len(logits)):
         best_id = np.argmax(logits)
         best_str = model.decode(best_id)
-        if is_token_valid(current_text, best_str, candidates):
-            return best_id, best_str
+        if is_token_valid(current_text, best_str, function_names):
+            return b    print(json.dumps(result, indent=2))id, best_str
         logits[best_id] = -np.inf
     raise RuntimeError
 
