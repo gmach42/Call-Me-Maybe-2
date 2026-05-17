@@ -7,11 +7,8 @@ picking the argmax, so the produced output is always schema-compliant.
 
 import re
 from typing import Any
-
 import numpy as np
-
 from llm_sdk.llm_sdk import Small_LLM_Model
-
 from .pydantic_models import FunctionDefinition
 
 # Matches a complete or partial valid JSON number (used as a prefix check).
@@ -24,21 +21,12 @@ TOP_K = 100  # number of top logits to inspect for value generation
 MAX_NUM_STEPS = 32
 MAX_STR_STEPS = 64
 
-# ---------------------------------------------------------------------------
-# Token decode cache
-# ---------------------------------------------------------------------------
-
 
 def _tok(model: Small_LLM_Model, tid: int, cache: dict[int, str]) -> str:
     """Decode a single token ID, with caching."""
     if tid not in cache:
         cache[tid] = model.decode([tid])
     return cache[tid]
-
-
-# ---------------------------------------------------------------------------
-# Function name — constrained decoding
-# ---------------------------------------------------------------------------
 
 
 def generate_function_name(
@@ -89,11 +77,6 @@ def generate_function_name(
         ]
 
     return model.decode(generated)
-
-
-# ---------------------------------------------------------------------------
-# Number value — constrained decoding
-# ---------------------------------------------------------------------------
 
 
 def generate_number_value(
@@ -152,11 +135,6 @@ def generate_number_value(
         return 0.0
 
 
-# ---------------------------------------------------------------------------
-# String value — constrained decoding
-# ---------------------------------------------------------------------------
-
-
 def generate_string_value(
     model: Small_LLM_Model,
     input_ids: list[int],
@@ -186,11 +164,6 @@ def generate_string_value(
     return raw
 
 
-# ---------------------------------------------------------------------------
-# Boolean value — constrained decoding
-# ---------------------------------------------------------------------------
-
-
 def generate_bool_value(
     model: Small_LLM_Model,
     input_ids: list[int],
@@ -216,11 +189,6 @@ def generate_bool_value(
             best_false = logits[tid]
 
     return best_true >= best_false
-
-
-# ---------------------------------------------------------------------------
-# Dispatch helper
-# ---------------------------------------------------------------------------
 
 
 def generate_value(
