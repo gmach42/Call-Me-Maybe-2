@@ -1,16 +1,22 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Any
 
 
 class PromptItem(BaseModel):
+    """A single natural-language prompt from the input file."""
+
     prompt: str
 
 
 class FunctionParameter(BaseModel):
+    """Describes one parameter of a function (its JSON type)."""
+
     type: str
 
 
 class FunctionDefinition(BaseModel):
+    """Full definition of a callable function."""
+
     name: str
     description: str
     parameters: dict[str, FunctionParameter]
@@ -18,5 +24,8 @@ class FunctionDefinition(BaseModel):
 
 
 class FunctionCallResult(BaseModel):
-    function: str = Field(..., description="Chosen function name")
-    arguments: dict[str, Any]
+    """Result of processing one prompt: chosen function + extracted args."""
+
+    prompt: str
+    name: str
+    parameters: dict[str, Any]

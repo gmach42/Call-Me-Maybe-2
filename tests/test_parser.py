@@ -17,7 +17,7 @@ def test_load_json_file_reads_valid_json(tmp_path: Path) -> None:
 def test_load_json_file_raises_for_missing_file(tmp_path: Path) -> None:
     file_path = tmp_path / "missing.json"
 
-    with pytest.raises(ValueError, match="Fichier introuvable"):
+    with pytest.raises(ValueError, match="File not found"):
         load_json_file(file_path)
 
 
@@ -25,5 +25,5 @@ def test_load_json_file_raises_for_invalid_json(tmp_path: Path) -> None:
     file_path = tmp_path / "broken.json"
     file_path.write_text("{broken", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="JSON invalide"):
+    with pytest.raises(ValueError, match="Invalid JSON"):
         load_json_file(file_path)

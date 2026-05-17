@@ -11,7 +11,6 @@ from src.pydantic_models import (
 
 def test_prompt_item_validation() -> None:
     item = PromptItem(prompt="What is the sum of 2 and 3?")
-
     assert item.prompt == "What is the sum of 2 and 3?"
 
 
@@ -25,20 +24,26 @@ def test_function_definition_validation() -> None:
         },
         returns={"type": "number"},
     )
-
     assert definition.name == "fn_add_numbers"
     assert definition.parameters["a"].type == "number"
 
 
 def test_function_call_result_validation() -> None:
     result = FunctionCallResult(
-        function="fn_add_numbers",
-        arguments={"a": 2, "b": 3},
+        prompt="What is the sum of 2 and 3?",
+        name="fn_add_numbers",
+        parameters={
+            "a": 2.0,
+            "b": 3.0
+        },
     )
+    assert result.name == "fn_add_numbers"
+    assert result.parameters == {"a": 2.0, "b": 3.0}
 
-    assert result.arguments == {"a": 2, "b": 3}
 
-
-def test_function_call_result_rejects_missing_arguments() -> None:
+def test_function_call_result_rejects_missing_name() -> None:
     with pytest.raises(ValidationError):
-        FunctionCallResult.model_validate({"function": "fn_add_numbers"})
+        FunctionCallResult.model_validate({
+            "prompt": "hello",
+            "parameters": {}
+        })
