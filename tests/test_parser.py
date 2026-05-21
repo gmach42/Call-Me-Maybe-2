@@ -1,7 +1,5 @@
 from pathlib import Path
-
 import pytest
-
 from src.parser import load_json_file
 
 

@@ -7,7 +7,7 @@ from pathlib import Path
 from llm_sdk.llm_sdk import Small_LLM_Model
 
 from .parser import load_functions, load_prompts
-from .pipeline import run
+from .pipeline import run 
 
 DEFAULT_FUNCTIONS = Path("data/input/functions_definition.json")
 DEFAULT_INPUT = Path("data/input/function_calling_tests.json")
