@@ -188,3 +188,5 @@ Example output entry:
 **AI usage** — GitHub Copilot was used to help design and implement the
 constrained decoding logic, the prompt format, and the pipeline structure.
 All generated code was reviewed, understood, and tested before inclusion.
+
+![alt text](image.png)
