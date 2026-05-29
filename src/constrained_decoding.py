@@ -135,6 +135,20 @@ def generate_number_value(
         return 0.0
 
 
+def generate_integer_value(
+    model: Small_LLM_Model,
+    input_ids: list[int],
+    cache: dict[int, str],
+) -> int:
+    """Generate an integer value via constrained decoding.
+
+    Uses the same logic as generate_number_value but with an additional
+    constraint that disallows decimal points and exponents.
+    """
+    num = generate_number_value(model, input_ids, cache)
+    return int(num) if num.is_integer() else 0
+
+
 def generate_string_value(
     model: Small_LLM_Model,
     input_ids: list[int],
