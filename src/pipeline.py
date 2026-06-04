@@ -7,7 +7,11 @@ from typing import Any
 
 from llm_sdk.llm_sdk import Small_LLM_Model
 
-from .constrained_decoding import generate_function_name, generate_value
+from .constrained_decoding import (
+    TYPE_MAP,
+    generate_function_name,
+    generate_value,
+)
 from .pydantic_models import FunctionCallResult, FunctionDefinition, PromptItem
 
 
@@ -59,7 +63,8 @@ def _param_context(
 
     # Open the current key; for strings include the opening quote so the
     # model generates value tokens starting right after it.
-    if param_type == "string":
+    normalized_type = TYPE_MAP.get(param_type, param_type)
+    if normalized_type == "string":
         ctx += f'"{param_key}": "'
     else:
         ctx += f'"{param_key}": '

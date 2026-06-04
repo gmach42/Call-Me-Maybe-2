@@ -3,6 +3,7 @@
 import argparse
 import sys
 from pathlib import Path
+import time
 
 from llm_sdk.llm_sdk import Small_LLM_Model
 
@@ -15,8 +16,9 @@ DEFAULT_OUTPUT = Path("data/output/function_calling_results.json")
 
 
 def _parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
     p = argparse.ArgumentParser(
-        description=("Translate natural-language prompts "
+        description=("Translate user prompts "
                      "into structured function calls."))
     p.add_argument(
         "--functions_definition",
@@ -44,6 +46,7 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     """Main entry point."""
+    start_time = time.time()
     args = _parse_args()
 
     try:
@@ -74,6 +77,10 @@ def main() -> None:
         sys.exit(1)
 
     run(model, prompts, functions, args.output)
+
+    end_time = time.time()
+    print(f"Execution time: {end_time - start_time:.1f} seconds\n",
+          file=sys.stderr)
 
 
 if __name__ == "__main__":

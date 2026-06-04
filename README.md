@@ -190,3 +190,13 @@ constrained decoding logic, the prompt format, and the pipeline structure.
 All generated code was reviewed, understood, and tested before inclusion.
 
 ![alt text](image.png)
+
+to run the program with goinfre use:
+```bash
+CACHE_DIR=~/goinfre/cmmcache make run
+```
+or
+```bash
+export CACHE_DIR=~/goinfre/cmmcache
+make run
+```

@@ -21,8 +21,17 @@ TOP_K = 100  # number of top logits to inspect for value generation
 MAX_NUM_STEPS = 32
 MAX_STR_STEPS = 64
 
+TYPE_MAP = {
+    "int": "integer",
+    "float": "number",
+    "str": "string",
+    "bool": "boolean",
+    "list": "array",
+    "dict": "object",
+}
 
-def _tok(model: Small_LLM_Model, tid: int, cache: dict[int, str]) -> str:
+
+def _token(model: Small_LLM_Model, tid: int, cache: dict[int, str]) -> str:
     """Decode a single token ID, with caching."""
     if tid not in cache:
         cache[tid] = model.decode([tid])
@@ -100,7 +109,7 @@ def generate_number_value(
         arr = np.array(logits, dtype=np.float32)
         top_ids: list[int] = np.argsort(arr)[-TOP_K:][::-1].tolist()
 
-        greedy_str = _tok(model, int(top_ids[0]), cache).strip()
+        greedy_str = _token(model, int(top_ids[0]), cache).strip()
 
         # If we already have content and the greedy choice is not a number
         # character, the model wants to end the value — stop.
@@ -111,7 +120,7 @@ def generate_number_value(
         best_num_id: int | None = None
         best_num_logit = NEGINF
         for tid in top_ids:
-            s = _tok(model, tid, cache).strip()
+            s = _token(model, tid, cache).strip()
             if not s:
                 continue
             if not _NUM_CHARS_RE.match(s):
@@ -126,7 +135,7 @@ def generate_number_value(
         if best_num_id is None:
             break
 
-        raw += _tok(model, best_num_id, cache).strip()
+        raw += _token(model, best_num_id, cache).strip()
         ctx.append(best_num_id)
 
     try:
@@ -166,7 +175,7 @@ def generate_string_value(
     for _ in range(MAX_STR_STEPS):
         logits = model.get_logits_from_input_ids(ctx)
         best_id = int(np.argmax(np.array(logits, dtype=np.float32)))
-        best_str = _tok(model, best_id, cache)
+        best_str = _token(model, best_id, cache)
 
         if '"' in best_str:
             raw += best_str.split('"')[0]
@@ -196,7 +205,7 @@ def generate_bool_value(
     best_false = NEGINF
 
     for tid in top_ids:
-        s = _tok(model, tid, cache)
+        s = _token(model, tid, cache)
         if s == "true" and logits[tid] > best_true:
             best_true = logits[tid]
         elif s == "false" and logits[tid] > best_false:
@@ -212,8 +221,11 @@ def generate_value(
     cache: dict[int, str],
 ) -> Any:
     """Dispatch to the appropriate constrained generator by JSON type."""
+    param_type = TYPE_MAP.get(param_type, param_type)
     if param_type == "number":
         return generate_number_value(model, input_ids, cache)
+    if param_type == "integer":
+        return generate_integer_value(model, input_ids, cache)
     if param_type == "string":
         return generate_string_value(model, input_ids, cache)
     if param_type == "boolean":
