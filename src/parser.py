@@ -1,8 +1,13 @@
 import json
+import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
+
+from pydantic import BaseModel, ValidationError
 
 from .pydantic_models import FunctionDefinition, PromptItem
+
+ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 def load_json_file(path: Path) -> Any:
@@ -16,12 +21,26 @@ def load_json_file(path: Path) -> Any:
         raise ValueError(f"Invalid JSON in {path}: {exc}") from exc
 
 
+def _validate_items(
+    raw: list[Any], model: type[ModelT], path: Path
+) -> list[ModelT]:
+    """Validate each item against model, skipping invalid ones with a message."""  # noqa: E501
+    items: list[ModelT] = []
+    for i, entry in enumerate(raw, 1):
+        try:
+            items.append(model.model_validate(entry))
+        except ValidationError as exc:
+            print(f"Skipping invalid entry #{i} in {path}: {exc}",
+                  file=sys.stderr)
+    return items
+
+
 def load_functions(path: Path) -> list[FunctionDefinition]:
     """Load and validate function definitions from a JSON file."""
     raw = load_json_file(path)
     if not isinstance(raw, list):
         raise ValueError(f"Expected a JSON array in {path}")
-    return [FunctionDefinition.model_validate(fn) for fn in raw]
+    return _validate_items(raw, FunctionDefinition, path)
 
 
 def load_prompts(path: Path) -> list[PromptItem]:
@@ -29,4 +48,4 @@ def load_prompts(path: Path) -> list[PromptItem]:
     raw = load_json_file(path)
     if not isinstance(raw, list):
         raise ValueError(f"Expected a JSON array in {path}")
-    return [PromptItem.model_validate(p) for p in raw]
+    return _validate_items(raw, PromptItem, path)
