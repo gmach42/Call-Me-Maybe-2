@@ -45,18 +45,10 @@ def _param_context(
     """
     ctx = base + fn_name + "\nParameters: {"
 
-    items: list[str] = []
-    for k, v in collected.items():
-        if isinstance(v, bool):
-            items.append(f'"{k}": {"true" if v else "false"}')
-        elif isinstance(v, str):
-            # Escape internal quotes to keep the JSON valid in context.
-            escaped = v.replace('\\', '\\\\').replace('"', '\\"')
-            items.append(f'"{k}": "{escaped}"')
-        else:
-            items.append(f'"{k}": {v}')
-
-    if items:
+    if collected:
+        # json.dumps handles quoting/escaping (including control chars
+        # like \n, \t) for every collected value type uniformly.
+        items = [f'"{k}": {json.dumps(v)}' for k, v in collected.items()]
         ctx += ", ".join(items) + ", "
 
     # Open the current key; for strings include the opening quote so the

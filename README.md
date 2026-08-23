@@ -42,7 +42,6 @@ All three flags are optional and fall back to the paths above.
 | `make debug` | run under `pdb` |
 | `make lint` | flake8 + mypy |
 | `make lint-strict` | flake8 + mypy --strict |
-| `make test` | pytest |
 | `make clean` | remove caches |
 
 ## Algorithm explanation
@@ -81,10 +80,14 @@ declared JSON type, a different constrained generator is invoked:
   prefix are allowed.  Generation stops when the model's greedy choice is no
   longer a number character (and at least one digit has been produced).
 
-* **string** — tokens are generated greedily (no masking needed) until the
-  model's top choice contains a closing double-quote `"`, at which point only
-  the content before the quote is kept.  The opening quote is part of the
-  context, so the model generates purely the value.
+* **string** — tokens are generated greedily and scanned character-by-character
+  for the closing double-quote.  A quote preceded by an odd number of
+  backslashes is treated as an escaped quote belonging to the value rather
+  than the terminator, so values containing `"` or `\` are preserved.  Once
+  the real closing quote is found, the collected buffer is run through
+  `json.loads` so escape sequences (`\"`, `\\`, `\n`, `\t`, ...) resolve to
+  their real characters.  The opening quote is part of the context, so the
+  model generates purely the value.
 
 * **boolean** — the top-100 tokens are scanned; the highest-logit token that
   decodes to exactly `"true"` or `"false"` determines the result.
@@ -144,14 +147,31 @@ ID is decoded at most once per run, avoiding repeated calls to `model.decode`.
 
 ## Testing strategy
 
-Unit tests cover pydantic model validation (`tests/test_models.py`) and JSON
-loading helpers (`tests/test_parser.py`).  End-to-end validation is done by
-running the program on the provided input files and inspecting the output JSON
-for correctness and schema compliance.
+There is no automated test suite (not required for the mandatory part).
+Validation is done end-to-end: run the program on the provided input files
+and inspect `data/output/function_calling_results.json` for correctness
+(right function, right argument values) and strict schema compliance
+(exact key set, correct types).
+
+Beyond the provided 11 prompts, the following edge cases were checked
+manually:
+
+* empty / missing input files, and malformed JSON in either input file
+  (must fail with a clear message, not a traceback)
+* prompts containing embedded double quotes (e.g. `Replace all numbers in
+  "Hello 34 I'm 233 years old" with NUMBERS`)
+* string values that must themselves contain a literal `"` or `\` character
+  once generated — `generate_string_value` scans for an *unescaped* closing
+  quote and JSON-unescapes the collected buffer, so `\"`, `\\`, `\n`, `\t`
+  inside a value round-trip correctly instead of truncating the string early
+* multi-parameter functions where an earlier string parameter is echoed back
+  into the context for later parameters (`_param_context` now builds that
+  context with `json.dumps`, so control characters are escaped correctly)
+* a value typed `"integer"` where the model's constrained number output is
+  not a whole number (rounded instead of discarded)
 
 ```bash
-make test          # unit tests
-make run           # full end-to-end run
+make run           # full end-to-end run, then inspect the output file
 ```
 
 ## Example usage

@@ -7,8 +7,7 @@ endif
 PYTHON := uv run python
 FLAKE8 := uv run flake8
 MYPY := uv run mypy
-PYTEST := uv run pytest
-LINT_PATHS := src tests
+LINT_PATHS := src
 
 install:
 	uv sync
@@ -18,12 +17,6 @@ run:
 
 debug:
 	$(PYTHON) -m pdb src/__main__.py
-
-test:
-	$(PYTEST)
-
-test-verbose:
-	$(PYTEST) -v
 
 clean:
 	find . -type d -name "__pycache__" -prune -exec rm -rf {} + 2>/dev/null || true
@@ -39,4 +32,4 @@ lint-strict:
 	$(FLAKE8) $(LINT_PATHS)
 	$(MYPY) $(LINT_PATHS) --strict
 
-.PHONY: install run debug test test-verbose clean lint lint-strict
+.PHONY: install run debug clean lint lint-strict

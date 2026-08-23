@@ -5,6 +5,7 @@ masking logits to -inf (or by restricting candidate sets) before
 picking the argmax, so the produced output is always schema-compliant.
 """
 
+import json
 import re
 from typing import Any
 import numpy as np
@@ -151,11 +152,12 @@ def generate_integer_value(
 ) -> int:
     """Generate an integer value via constrained decoding.
 
-    Uses the same logic as generate_number_value but with an additional
-    constraint that disallows decimal points and exponents.
+    Reuses the number generator, then rounds to the nearest integer so a
+    model output like ``3.0`` or ``3.4`` still yields a usable integer
+    instead of being discarded.
     """
     num = generate_number_value(model, input_ids, cache)
-    return int(num) if num.is_integer() else 0
+    return round(num)
 
 
 def generate_string_value(
@@ -166,25 +168,49 @@ def generate_string_value(
     """Generate a string value via constrained decoding.
 
     The context already contains the opening quote.  Tokens are generated
-    greedily and appended until the model's top choice contains a closing
-    double-quote, at which point only the content before the quote is kept.
+    greedily and appended to a raw JSON-escaped buffer, scanning character
+    by character for the closing double-quote.  A quote preceded by an
+    (unescaped) backslash is treated as an escaped quote belonging to the
+    value rather than the terminator, so values that legitimately contain
+    `"` or `\\` are preserved.  The buffer is finally run through the JSON
+    decoder so escape sequences (`\\"`, `\\\\`, `\\n`, `\\t`, ...) collapse
+    to their real characters.
     """
     ctx: list[int] = list(input_ids)
-    raw = ""
+    json_content = ""
+    escaped = False
+    closed = False
 
     for _ in range(MAX_STR_STEPS):
         logits = model.get_logits_from_input_ids(ctx)
         best_id = int(np.argmax(np.array(logits, dtype=np.float32)))
         best_str = _token(model, best_id, cache)
 
-        if '"' in best_str:
-            raw += best_str.split('"')[0]
+        stop_at: int | None = None
+        for i, ch in enumerate(best_str):
+            if escaped:
+                escaped = False
+                continue
+            if ch == '\\':
+                escaped = True
+            elif ch == '"':
+                stop_at = i
+                break
+
+        if stop_at is not None:
+            json_content += best_str[:stop_at]
+            closed = True
             break
 
-        raw += best_str
+        json_content += best_str
         ctx.append(best_id)
 
-    return raw
+    if closed:
+        try:
+            return str(json.loads(f'"{json_content}"'))
+        except json.JSONDecodeError:
+            return json_content
+    return json_content
 
 
 def generate_bool_value(

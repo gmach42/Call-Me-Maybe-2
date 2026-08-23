@@ -10,8 +10,8 @@ def load_json_file(path: Path) -> Any:
     try:
         with path.open("r", encoding="utf-8") as fh:
             return json.load(fh)
-    except FileNotFoundError:
-        raise ValueError(f"File not found: {path}")
+    except OSError as exc:
+        raise ValueError(f"Cannot read {path}: {exc}") from exc
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid JSON in {path}: {exc}") from exc
 
