@@ -43,8 +43,6 @@ def _param_context(
     so the LLM immediately generates the value tokens.
     For string parameters the opening quote is included in the suffix.
     """
-    # base ends with "Function: ", so appending fn_name gives
-    # "...Function: fn_add_numbers"
     ctx = base + fn_name + "\nParameters: {"
 
     items: list[str] = []
