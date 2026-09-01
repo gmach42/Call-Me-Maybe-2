@@ -37,17 +37,11 @@ def _param_context(
     param_type: str,
     collected: dict[str, Any],
 ) -> str:
-    """Build the context string used to generate one parameter value.
+    """Build the context string used to generate one parameter value."""
 
-    The returned string ends just before where the value should appear,
-    so the LLM immediately generates the value tokens.
-    For string parameters the opening quote is included in the suffix.
-    """
     ctx = base + fn_name + "\nParameters: {"
 
     if collected:
-        # json.dumps handles quoting/escaping (including control chars
-        # like \n, \t) for every collected value type uniformly.
         items = [f'"{k}": {json.dumps(v)}' for k, v in collected.items()]
         ctx += ", ".join(items) + ", "
 

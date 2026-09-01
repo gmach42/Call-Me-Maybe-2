@@ -26,7 +26,7 @@ def _parse_args() -> argparse.Namespace:
         default=DEFAULT_FUNCTIONS,
         metavar="FILE",
         help="Path to functions_definition.json",
-    )  # noqa: E501
+    )
     p.add_argument(
         "--input",
         type=Path,

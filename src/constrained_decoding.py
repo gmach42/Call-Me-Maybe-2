@@ -1,8 +1,7 @@
 """Constrained decoding utilities.
 
 All generation is done token-by-token. Invalid tokens are excluded by
-masking logits to -inf (or by restricting candidate sets) before
-picking the argmax, so the produced output is always schema-compliant.
+masking logits to -inf.
 """
 
 import json
@@ -44,13 +43,7 @@ def generate_function_name(
     input_ids: list[int],
     functions: list[FunctionDefinition],
 ) -> str:
-    """Select a function name via constrained decoding.
-
-    Each function name is pre-tokenized once. At every generation step only
-    the token IDs that are the correct next token in at least one still-active
-    candidate are allowed. The winner is the first candidate whose token
-    sequence is fully matched.
-    """
+    """Select a function name via constrained decoding."""
     fn_seqs: list[tuple[str, list[int]]] = [
         (fn.name, model.encode(fn.name)[0].tolist()) for fn in functions
     ]
@@ -94,14 +87,8 @@ def generate_number_value(
     input_ids: list[int],
     cache: dict[int, str],
 ) -> float:
-    """Generate a number value via constrained decoding.
+    """Generate a number value via constrained decoding."""
 
-    Inspects the TOP_K highest-logit tokens at each step and keeps only
-    those whose decoded string consists entirely of valid number characters
-    and whose concatenation with the accumulated string is still a valid
-    number prefix.  Stops when the model's greedy choice is no longer a
-    number character (and we already have at least one digit).
-    """
     ctx: list[int] = list(input_ids)
     raw = ""
 
@@ -112,8 +99,6 @@ def generate_number_value(
 
         greedy_str = _token(model, int(top_ids[0]), cache).strip()
 
-        # If we already have content and the greedy choice is not a number
-        # character, the model wants to end the value — stop.
         if raw and not _NUM_CHARS_RE.match(greedy_str):
             break
 
@@ -150,12 +135,8 @@ def generate_integer_value(
     input_ids: list[int],
     cache: dict[int, str],
 ) -> int:
-    """Generate an integer value via constrained decoding.
+    """Generate an integer value via constrained decoding."""
 
-    Reuses the number generator, then rounds to the nearest integer so a
-    model output like ``3.0`` or ``3.4`` still yields a usable integer
-    instead of being discarded.
-    """
     num = generate_number_value(model, input_ids, cache)
     return round(num)
 
@@ -165,17 +146,7 @@ def generate_string_value(
     input_ids: list[int],
     cache: dict[int, str],
 ) -> str:
-    """Generate a string value via constrained decoding.
-
-    The context already contains the opening quote.  Tokens are generated
-    greedily and appended to a raw JSON-escaped buffer, scanning character
-    by character for the closing double-quote.  A quote preceded by an
-    (unescaped) backslash is treated as an escaped quote belonging to the
-    value rather than the terminator, so values that legitimately contain
-    `"` or `\\` are preserved.  The buffer is finally run through the JSON
-    decoder so escape sequences (`\\"`, `\\\\`, `\\n`, `\\t`, ...) collapse
-    to their real characters.
-    """
+    """Generate a string value via constrained decoding."""
     ctx: list[int] = list(input_ids)
     json_content = ""
     escaped = False
@@ -218,11 +189,7 @@ def generate_bool_value(
     input_ids: list[int],
     cache: dict[int, str],
 ) -> bool:
-    """Generate a boolean value via constrained decoding.
-
-    Scans the TOP_K tokens for tokens that decode to exactly 'true' or
-    'false' and returns the boolean corresponding to the higher-logit one.
-    """
+    """Generate a boolean value via constrained decoding."""
     logits = model.get_logits_from_input_ids(input_ids)
     arr = np.array(logits, dtype=np.float32)
     top_ids: list[int] = np.argsort(arr)[-TOP_K:][::-1].tolist()
@@ -247,6 +214,7 @@ def generate_value(
     cache: dict[int, str],
 ) -> Any:
     """Dispatch to the appropriate constrained generator by JSON type."""
+
     param_type = TYPE_MAP.get(param_type, param_type)
     if param_type == "number":
         return generate_number_value(model, input_ids, cache)
@@ -256,5 +224,4 @@ def generate_value(
         return generate_string_value(model, input_ids, cache)
     if param_type == "boolean":
         return generate_bool_value(model, input_ids, cache)
-    # Unknown type: return None (will be caught by validation)
     return None

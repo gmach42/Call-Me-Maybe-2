@@ -1,3 +1,5 @@
+"""Load and validate JSON input files (functions and prompts)."""
+
 import json
 import sys
 from pathlib import Path
@@ -11,7 +13,7 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 def load_json_file(path: Path) -> Any:
-    """Load and parse a JSON file, raising ValueError on missing or invalid."""  # noqa: E501
+    """Load and parse a JSON file, raising ValueError on missing or invalid."""
     try:
         with path.open("r", encoding="utf-8") as fh:
             return json.load(fh)
@@ -24,7 +26,7 @@ def load_json_file(path: Path) -> Any:
 def _validate_items(
     raw: list[Any], model: type[ModelT], path: Path
 ) -> list[ModelT]:
-    """Validate each item against model, skipping invalid ones with a message."""  # noqa: E501
+    """Validate each item, skipping invalid ones with a message."""
     items: list[ModelT] = []
     for i, entry in enumerate(raw, 1):
         try:

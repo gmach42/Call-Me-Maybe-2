@@ -10,6 +10,7 @@ dependencies = [
 	"llm-sdk",
 	"flake8",
 	"mypy",
+	"accelerate",
 ]
 
 [tool.uv.workspace]

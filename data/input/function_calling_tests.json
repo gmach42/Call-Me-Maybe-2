@@ -1,12 +1,12 @@
 [
   {
-    "prompt": "What is the sum of -2 and 3?"
+    "prompt": "What is the sum of 2 and 3?"
   },
   {
-    "prompt":""
+    "prompt": "What is the sum of 265 and 345?"
   },
   {
-    "test": "Greet shrek"
+    "prompt": "Greet shrek"
   },
   {
     "prompt": "Greet john"
@@ -15,24 +15,21 @@
     "prompt": "Reverse the string 'hello'"
   },
   {
-    "prompt": "multiply 6 by 7"
+    "prompt": "Reverse the string 'world'"
   },
   {
     "prompt": "What is the square root of 16?"
   },
   {
-    "prompt": "Calculate the \n\tsquare root of 144"
+    "prompt": "Calculate the square root of 144"
   },
   {
-    "prompt": "Replace all ´numbers´ in \"Hello 34 I'm 233 years old\" with NUMBERS"
+    "prompt": "Replace all numbers in \"Hello 34 I'm 233 years old\" with NUMBERS"
   },
   {
-    "Replace all vowels in 'Programming is fun' with asterisks": 5
+    "prompt": "Replace all vowels in 'Programming is fun' with asterisks"
   },
   {
     "prompt": "Substitute the word 'cat' with 'dog' in 'The cat sat on the mat with another cat'"
-  },
-  {
-    "prompt": "Replace all '/' with a '`' in '/This/ is a /test/'"
   }
 ]

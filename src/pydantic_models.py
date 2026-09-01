@@ -1,3 +1,5 @@
+"""Pydantic models shared across the pipeline: prompts, functions, results."""
+
 from pydantic import BaseModel
 from typing import Any
 
