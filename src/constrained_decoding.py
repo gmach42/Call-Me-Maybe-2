@@ -16,8 +16,9 @@ _NUM_PREFIX_RE = re.compile(r'^-?[0-9]*\.?[0-9]*([eE][+-]?[0-9]*)?$')
 # Matches a string made entirely of number characters.
 _NUM_CHARS_RE = re.compile(r'^[-0-9.eE+]+$')
 
+# Constants for constrained decoding.
 NEGINF = float('-inf')
-TOP_K = 100  # number of top logits to inspect for value generation
+TOP_K = 100
 MAX_NUM_STEPS = 32
 MAX_STR_STEPS = 64
 
@@ -55,7 +56,6 @@ def generate_function_name(
     while active:
         pos = len(generated)
 
-        # Return immediately if any active candidate is fully matched.
         for i in active:
             if pos == len(fn_seqs[i][1]):
                 return fn_seqs[i][0]
@@ -88,7 +88,6 @@ def generate_number_value(
     cache: dict[int, str],
 ) -> float:
     """Generate a number value via constrained decoding."""
-
     ctx: list[int] = list(input_ids)
     raw = ""
 
@@ -102,7 +101,6 @@ def generate_number_value(
         if raw and not _NUM_CHARS_RE.match(greedy_str):
             break
 
-        # Find the highest-logit valid number token in top-K.
         best_num_id: int | None = None
         best_num_logit = NEGINF
         for tid in top_ids:
@@ -136,7 +134,6 @@ def generate_integer_value(
     cache: dict[int, str],
 ) -> int:
     """Generate an integer value via constrained decoding."""
-
     num = generate_number_value(model, input_ids, cache)
     return round(num)
 
@@ -146,7 +143,13 @@ def generate_string_value(
     input_ids: list[int],
     cache: dict[int, str],
 ) -> str:
-    """Generate a string value via constrained decoding."""
+    """Generate a string value via constrained decoding.
+
+    Args:
+        model: The LLM model to use for constrained decoding.
+        input_ids: The list of input token IDs to start from.
+        cache: A dictionary to cache token ID to string mappings.
+    """
     ctx: list[int] = list(input_ids)
     json_content = ""
     escaped = False

@@ -1,4 +1,4 @@
-"""Processing pipeline: prompt → function call result."""
+"""Processing pipeline: prompt -> function call result."""
 
 import json
 import sys
@@ -37,16 +37,24 @@ def _param_context(
     param_type: str,
     collected: dict[str, Any],
 ) -> str:
-    """Build the context string used to generate one parameter value."""
+    """Build the context string used to generate one parameter value.
 
+    Args:
+        base: The base prompt string.
+        fn_name: The name of the function being called.
+        param_key: The name of the parameter being generated.
+        param_type: The type of the parameter being generated.
+        collected: A dictionary of already-collected parameter values.
+
+    Returns:
+        A context string for generating the parameter value.
+    """
     ctx = base + fn_name + "\nParameters: {"
 
     if collected:
         items = [f'"{k}": {json.dumps(v)}' for k, v in collected.items()]
         ctx += ", ".join(items) + ", "
 
-    # Open the current key; for strings include the opening quote so the
-    # model generates value tokens starting right after it.
     normalized_type = TYPE_MAP.get(param_type, param_type)
     if normalized_type == "string":
         ctx += f'"{param_key}": "'
@@ -62,7 +70,18 @@ def process_prompt(
     functions: list[FunctionDefinition],
     cache: dict[int, str],
 ) -> FunctionCallResult:
-    """Turn one PromptItem into a FunctionCallResult."""
+    """Turn one PromptItem into a FunctionCallResult.
+
+    Args:
+        model: The LLM model to use for constrained decoding.
+        item: The prompt item to process.
+        functions: The list of available function definitions.
+        cache: A dictionary to cache token ID to string mappings.
+
+    Returns:
+        A FunctionCallResult containing the selected function name
+            and parameters.
+    """
     base = _base_prompt(item.prompt, functions)
     fn_input_ids: list[int] = model.encode(base)[0].tolist()
 
@@ -95,7 +114,17 @@ def run(
     functions: list[FunctionDefinition],
     output_path: Path,
 ) -> None:
-    """Process every prompt and write results to output_path as JSON."""
+    """Process every prompt and write results to output_path as JSON.
+
+    Create a cache to avoid repeated decoding of the same token IDs
+    across prompts.
+
+    Args:
+        model: The LLM model to use for constrained decoding.
+        prompts: A list of PromptItem objects to process.
+        functions: A list of available function definitions.
+        output_path: The path to write the JSON output file.
+    """
     cache: dict[int, str] = {}
     results: list[dict[str, Any]] = []
 
