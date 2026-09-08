@@ -217,7 +217,6 @@ def generate_value(
     cache: dict[int, str],
 ) -> Any:
     """Dispatch to the appropriate constrained generator by JSON type."""
-
     param_type = TYPE_MAP.get(param_type, param_type)
     if param_type == "number":
         return generate_number_value(model, input_ids, cache)

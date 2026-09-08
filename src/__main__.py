@@ -45,7 +45,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    """Main entry point."""
+    """Run the CLI entry point."""
     start_time = time.time()
     args = _parse_args()
 

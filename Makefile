@@ -16,7 +16,7 @@ run:
 	$(PYTHON) -m src
 
 debug:
-	$(PYTHON) -m pdb src/__main__.py
+	$(PYTHON) -m pdb -m src
 
 clean:
 	find . -type d -name "__pycache__" -prune -exec rm -rf {} + 2>/dev/null || true

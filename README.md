@@ -1,6 +1,6 @@
 *This project has been created as part of the 42 curriculum by gmach.*
 
-# call me maybe — Introduction to function calling in LLMs
+# Call Me Maybe
 
 ## Description
 
@@ -14,35 +14,40 @@ to produce valid JSON on their own roughly 70 % of the time.  This implementatio
 achieves **100 % valid JSON** through **constrained decoding** — the model's logits are
 filtered at every generation step so that only schema-compliant tokens can be selected.
 
+### Schema of Call Me Maybe logic
+
+![alt text](image.png)
+
 ## Instructions
 
-### Installation
+To install the required dependencies, run:
 
 ```bash
-uv sync
+make install
 ```
-
-### Run
+To run the program with the default input and output paths, simply execute:
 
 ```bash
-uv run python -m src \
-  --functions_definition data/input/functions_definition.json \
-  --input               data/input/function_calling_tests.json \
-  --output              data/output/function_calling_results.json
+make run
 ```
-
-All three flags are optional and fall back to the paths above.
 
 ### Other Makefile targets
 
 | Target | Effect |
 |---|---|
-| `make install` | `uv sync` |
-| `make run` | run with default paths |
 | `make debug` | run under `pdb` |
 | `make lint` | flake8 + mypy |
 | `make lint-strict` | flake8 + mypy --strict |
 | `make clean` | remove caches |
+
+If you wish to change the input fill free to modify the paths in `Makefile` or pass them as command-line arguments:
+
+```bash
+uv run python -m src \
+  --functions_definition data/input/functions_definition.json \
+  --input               data/input/function_calling_tests.json \
+  --output              data/output/my_results.json
+```
 
 ## Algorithm explanation
 
@@ -206,10 +211,7 @@ Example output entry:
 * JSON schema spec — https://json-schema.org/
 
 **AI usage** — GitHub Copilot was used to help design and implement the
-constrained decoding logic, the prompt format, and the pipeline structure.
-All generated code was reviewed, understood, and tested before inclusion.
-
-![alt text](image.png)
+constrained decoding logic. It was also used to help write this README.md file.
 
 to run the program with goinfre use:
 ```bash
