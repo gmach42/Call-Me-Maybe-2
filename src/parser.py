@@ -9,6 +9,7 @@ from pydantic import BaseModel, ValidationError
 
 from .pydantic_models import FunctionDefinition, PromptItem
 
+# Type variable for Pydantic models (added for mypy type checking)
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
