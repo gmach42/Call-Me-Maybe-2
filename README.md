@@ -58,18 +58,6 @@ uv run python -m src \
   --output              data/output/my_results.json
 ```
 
-### Run program in goinfre
-
-to run the program with goinfre use:
-```bash
-CACHE_DIR=~/goinfre/cmmcache make run
-```
-or
-```bash
-export CACHE_DIR=~/goinfre/cmmcache
-make run
-```
-
 ## Algorithm explanation
 
 ### Function name selection
