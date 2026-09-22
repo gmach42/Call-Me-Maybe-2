@@ -1,5 +1,6 @@
 """Load and validate JSON input files (functions and prompts)."""
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -11,6 +12,39 @@ from .pydantic_models import FunctionDefinition, PromptItem
 
 # Type variable for Pydantic models (added for mypy type checking)
 ModelT = TypeVar("ModelT", bound=BaseModel)
+
+DEFAULT_FUNCTIONS = Path("data/input/functions_definition.json")
+DEFAULT_INPUT = Path("data/input/function_calling_tests.json")
+DEFAULT_OUTPUT = Path("data/output/function_calling_results.json")
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    p = argparse.ArgumentParser(
+        description=("Translate user prompts "
+                     "into structured function calls."))
+    p.add_argument(
+        "--functions_definition",
+        type=Path,
+        default=DEFAULT_FUNCTIONS,
+        metavar="FILE",
+        help="Path to functions_definition.json",
+    )
+    p.add_argument(
+        "--input",
+        type=Path,
+        default=DEFAULT_INPUT,
+        metavar="FILE",
+        help="Path to function_calling_tests.json",
+    )
+    p.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_OUTPUT,
+        metavar="FILE",
+        help="Path for the output JSON file",
+    )
+    return p.parse_args()
 
 
 def load_json_file(path: Path) -> Any:
