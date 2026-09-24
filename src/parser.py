@@ -73,11 +73,26 @@ def _validate_items(
 
 
 def load_functions(path: Path) -> list[FunctionDefinition]:
-    """Load and validate function definitions from a JSON file."""
+    """Load and validate function definitions from a JSON file.
+
+    Unlike prompts, an invalid function definition is fatal: it is
+    stopped and reported immediately rather than skipped, since a
+    malformed function (bad type, empty name, ...) would silently
+    corrupt the rest of the pipeline.
+    """
     raw = load_json_file(path)
     if not isinstance(raw, list):
         raise ValueError(f"Expected a JSON array in {path}")
-    return _validate_items(raw, FunctionDefinition, path)
+
+    functions: list[FunctionDefinition] = []
+    for i, entry in enumerate(raw, 1):
+        try:
+            functions.append(FunctionDefinition.model_validate(entry))
+        except ValidationError as exc:
+            raise ValueError(
+                f"Invalid function definition #{i} in {path}: {exc}"
+            ) from exc
+    return functions
 
 
 def load_prompts(path: Path) -> list[PromptItem]:

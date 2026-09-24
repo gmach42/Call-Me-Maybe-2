@@ -5,6 +5,7 @@ masking logits to -inf.
 """
 
 import json
+import math
 import re
 from typing import Any
 import numpy as np
@@ -133,8 +134,16 @@ def generate_integer_value(
     input_ids: list[int],
     cache: dict[int, str],
 ) -> int:
-    """Generate an integer value via constrained decoding."""
+    """Generate an integer value via constrained decoding.
+
+    A number long enough to overflow a float (e.g. 300+ digits) parses
+    to `inf` without raising, but `round(inf)` raises OverflowError.
+    Guard against that so an oversized generation degrades to 0
+    instead of crashing this prompt's processing.
+    """
     num = generate_number_value(model, input_ids, cache)
+    if math.isinf(num) or math.isnan(num):
+        return 0
     return round(num)
 
 
