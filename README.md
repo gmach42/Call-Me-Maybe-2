@@ -4,10 +4,7 @@
 
 ## Description
 
-This project implements a **function calling** system for small language models. In our case we are using a small LLM called 'Qwen' (Qwen3-0.6B).
-We are given a prompt (with possible multiple entries) and a set of function definitions (name, parameters, return type, description). The goal is to extract the most appropriate function name and the argument values from the prompt and output them in a JSON file.
-
-The goal of this project is to implement a **constrained decoding logic** that ensures the output is always valid according to the function definitions and the expected JSON schema.
+This project implements **function calling** for a small LLM (Qwen3-0.6B): given natural-language prompts and a set of function definitions (name, parameters, return type, description), it extracts the right function name and argument values and writes them to a JSON file. The core challenge is **constrained decoding** - guiding token-by-token generation so the output is always valid JSON matching the expected schema, without relying on the model to "just get it right".
 
 ### Qwen3-0.6B Characteristics
 
@@ -16,31 +13,21 @@ The goal of this project is to implement a **constrained decoding logic** that e
 | Parameters | 600M |
 | Layers | 28 |
 | Context window | up to 32,768 tokens |
-| Multilingual support | 100+ languages, with strong instruction-following and translation capabilities |
-| Modes | Thinking mode (complex logic, math, code) and Non-thinking mode (fast, general-purpose chat) |
+| Multilingual support | 100+ languages |
+| Modes | Thinking (complex logic, math, code) and Non-thinking (fast, general-purpose) |
 
-It's still a small-scale model, so it is definitely not as powerful as larger models, and not as good at reasoning and understanding complex instructions. However, it is still a very capable model that can be used for a variety of tasks and is a good choice for this project to demonstrate the constrained decoding logic.
+A small model, less reliable at reasoning than larger ones - which is exactly what makes it a good testbed for constrained decoding.
 
-### Schema of Call Me Maybe logic
-
-Here's a little schema of the logic of the project:
+### Schema
 
 ![alt text](image.png)
 
 ## Instructions
 
-To install the required dependencies, run:
-
 ```bash
-make install
+make install   # install dependencies
+make run       # run with default input/output paths
 ```
-To run the program with the default input and output paths, simply execute:
-
-```bash
-make run
-```
-
-### Other Makefile targets
 
 | Target | Effect |
 |---|---|
@@ -49,7 +36,7 @@ make run
 | `make lint-strict` | flake8 + mypy --strict |
 | `make clean` | remove caches |
 
-If you wish to change the input, feel free to modify the paths in `Makefile` or pass them as command-line arguments:
+Custom paths:
 
 ```bash
 uv run python -m src \
@@ -62,118 +49,79 @@ uv run python -m src \
 
 ### Function name selection
 
-Every function name is **pre-tokenized once** with `model.encode()` which is a method from the LLM that converts the function name into a sequence of token IDs. We store these function name token sequences in a dictionary for quick access.
-
-At each generation step the decoder maintains a set of *active* candidates
-(functions whose token sequence matches the tokens generated so far). At each step the top-K logits (K = 100) are inspected and only tokens that match the next token in any of the active candidates are allowed.  If a token is generated that does not match any active candidate, the decoding stops and the function with the longest matching prefix is selected.
+Every function name is pre-tokenized once with `model.encode()` and cached. The decoder keeps a set of *active* candidates (functions matching what's been generated so far); at each step it only allows tokens that continue at least one active candidate, picking the highest-logit one among them. Since the next token always comes from that valid set, at least one candidate always survives - the loop is guaranteed to end in an exact match. `generate_function_name` requires a non-empty function list and raises otherwise, instead of ever returning unmatched text.
 
 ### Parameter value generation
 
-After the function is chosen, the values are generated one parameter at a time.
-For each parameter the pipeline builds a full context string:
+For each parameter, the pipeline builds a context string ending right where the value should start:
 
 ```
 ...Function: fn_add_numbers
 Parameters: {"a":
 ```
 
-The LLM is asked to continue from that exact position.  Depending on the
-declared JSON type, a different constrained generator is used. 4 types are supported: **number** (and a specific one for **integer**), **string**, **boolean**.
+A different constrained generator runs depending on the declared type:
 
-* **number** - at each step the top-100 logits are inspected; only tokens
-  whose decoded string consists entirely of number characters (`[-0-9.eE+]`)
-  and whose concatenation with the accumulated value is still a valid number
-  prefix are allowed.  Generation stops when the model's greedy choice is no
-  longer a number character (and at least one digit has been produced).
+* **number/integer** - only tokens made of number characters (`[-0-9.eE+]`) that keep the accumulated value a valid number prefix are allowed; stops on the first non-number greedy choice. Scientific notation (`e`/`E`) can overflow a `float` to `inf` in just a few characters (e.g. `9e400`) - this is checked explicitly and raises instead of leaking `Infinity` into the output JSON.
+* **string** - generates until an unescaped closing quote is found, then JSON-unescapes the buffer. Raises if the quote is never found or the buffer isn't valid JSON once closed, instead of returning truncated/mangled text.
+* **boolean** - picks whichever of `"true"`/`"false"` has the higher logit among the top-100 tokens. Unlike the others, this one doesn't raise if neither is found - it currently defaults to `True` (known limitation, kept as-is for now).
 
-* **string** - tokens are generated one after another and till we find the closing double-quote.
-  Special character such as `\"`, `\\`, `\n`, `\t`, etc. are allowed and are handled by the decoder.  Once the closing quote is found, the collected buffer is run through
-  `json.loads` so escape sequences (`\"`, `\\`, `\n`, `\t`, ...) resolve to
-  their real characters.
-
-* **boolean** - the top-100 tokens are scanned; the highest-logit token that
-  decodes to exactly `"true"` or `"false"` determines the result.
-
-All three generators use a **decode cache** (`dict[int, str]`): each token
-ID is decoded at most once per run, avoiding repeated calls to `model.decode`.
+All generators share a `dict[int, str]` decode cache so each token ID is decoded at most once per run.
 
 ## Design decisions
 
-* **No vocab file** - the `get_path_to_vocab_file()` helper is not used.
-  Token strings are obtained on demand via `model.decode([token_id])` and
-  memoised in a shared dictionary.  This keeps the implementation simple and
-  independent of the file format.
-
-* **Prompt format** - for the prompt we use a simple format that is easy to parse and read. The function name is always on a line by itself, followed by the parameters in JSON format.  This makes it easy to extract the function name and parameters from the prompt.
-
-* **Parameter context reuse** - previously generated parameter values are
-  injected back into the context for each subsequent parameter, giving the
-  model full visibility of what has already been filled in.
-
-* **Token cache** - a single `dict[int, str]` is shared across all decoding steps and parameter generations.  Each token ID is decoded at most once per run.
-
-* **Ignore invalid inputs** - a choice was made to ignore invalid inputs and continue the decoding process. If an invalid input is encountered, a message will be printed and the decoder will continue to the next entry. The JSON in input must still be valid, otherwise the program will raise an error and stop.
+* **No vocab file** - token strings come from `model.decode([token_id])`, memoised in a shared cache, rather than parsing `get_path_to_vocab_file()`.
+* **Prompt format** - a simple, easy-to-parse layout: function name on its own line, then parameters as JSON.
+* **Parameter context reuse** - already-generated parameters are injected back into the context for later ones, so the model sees what it already committed to.
+* **Fatal vs. skippable input errors** - a bad `functions_definition.json` entry aborts the run (a malformed function could corrupt everything downstream); a bad prompt in `function_calling_tests.json` is skipped and logged instead. Malformed JSON in either file is always fatal.
+* **Strict parameter types** - `FunctionParameter.type` is a `Literal` of the exact types `generate_value` supports, rejected by Pydantic at load time if unknown - instead of silently reaching the dispatcher and returning `None`.
+* **Explicit failures over silent bad output** - the generators raise instead of returning a default-looking value (`0.0`, a truncated string, an unmatched name). `pipeline.run()` catches this once per prompt, logs it, and still writes a schema-valid placeholder (`name: ""`, `parameters: {}`) - the output always has exactly `prompt`/`name`/`parameters`, success or failure.
+* **Clean error messages** - `parser._format_errors` reformats Pydantic's `ValidationError` into one indented line per error, dropping the repeated "Value error," prefix and the doc-link noise.
 
 ## Performance analysis
 
-* **Accuracy** - since we're basically building the JSON output step by step, the decoder can only produce valid JSON that matches the schema.  The model is never allowed to generate arbitrary text, so the output is guaranteed to be JSON valid. Although some inaccuracies may occur especially for regex patterns and if the prompt is looking for an unknown function name. The decoder will try to find the closest match but it may not be the correct one.
-
-* **Speed** - thanks to the memoization of decoded tokens and the caching of intermediate results, the decoding process is relatively fast.  The most time-consuming part is the actual model inference, which is dependent on the model size and the hardware used.
+* **Accuracy** - the decoder can only ever emit valid, schema-compliant JSON; wrong answers are possible (e.g. ambiguous prompts, ambitious regex) but malformed output isn't.
+* **Speed** - dominated by model inference; token/decode caching removes redundant work around it.
+* **Safety caps** - `MAX_NUM_STEPS` (32), `MAX_STR_STEPS` (64), `TOP_K` (100) aren't benchmarked values, just guards against Qwen3-0.6B diverging or never terminating naturally during decoding.
 
 ## Challenges faced
 
-* **Subject/LLM comprehension** - I had a hard time understanding how the subject (and the LLM) works and the logit filtering process. I didn't really understand at first that the model had to generate the output step by step. I thought we had to generate the whole output at once and then filter the logits. This was a big misunderstanding that made me waste a lot of time at the beginning of the project.
-
-* **Special character handling** - special characters such as `\n`, `\t`, `\"`, and `\\` are handled by the decoder.  The decoder keeps track of whether the last character was a backslash and whether we are inside a string.  This allows us to correctly handle escape sequences and ensure that the generated string is valid JSON.
-
-* **Performance issues** - at the beginning of the project, I was working on a poorly performing machine and I had to find solutions to improve the performance. Thus the utilisation of caching and memoization.
-
-* **TypeVar for Pydantic models** - I had to create a TypeVar in the parser to handle different type of BaseModel according to the pydantic models I created. Otherwise, mypy would raise type errors. Another solution to this problem would have to simply use a function for each BaseModel but the solution seems less elegant and harder to maintain.
-
-* **Prompt engineering** - I messed a bit with the prompt but a simple straight to the point preprompt worked better.
-
-* **Regex patterns** - some regex patterns have been used to match and extract specific parts of the input data. This was especially useful for the number generation where we had to match a sequence of tokens that together form a valid number.
+* **Understanding the subject/LLM** - I initially thought the whole output had to be generated first and filtered after, not token-by-token. That misunderstanding cost a lot of early time.
+* **Special character handling** - tracking backslash/escape state token-by-token was needed to correctly detect the real closing quote and keep escape sequences valid.
+* **Performance on a slow machine** - pushed me toward caching and memoization early on.
+* **TypeVar for Pydantic models** - needed in the parser to validate different `BaseModel` types without mypy errors; a per-model function would have worked too but felt less maintainable.
+* **Prompt engineering** - a short, direct pre-prompt beat more elaborate ones.
+* **Regex patterns** - used to detect when a sequence of tokens together forms a valid number.
+* **Numeric overflow -> invalid JSON** - a huge/scientific-notation number can silently overflow `float()` to `inf`, which `json.dump` would render as the invalid token `Infinity` (RFC 8259 doesn't allow it). Fixed with an explicit `isinf`/`isnan` check, plus `allow_nan=False` as a last resort.
+* **Unnoticed unsupported types** - `type` was originally a free string, so a typo or unknown type would pass validation and silently yield `None`. Fixed by restricting it to a `Literal` of supported types.
+* **Silent fallbacks hiding failures** - some "shouldn't happen" fallback paths (default `0.0`, truncated strings, unmatched names) turned out reachable or misleading. Replaced with explicit, descriptive errors caught once at the pipeline level.
 
 ## Testing strategy
 
-There is no automated test suite (not required for the mandatory part).
-Most of the testing was done manually by running the program with different prompts and checking the output.
+No automated test suite (not required for the mandatory part) - tested manually against the provided prompts plus these edge cases:
 
-Beyond the provided 11 prompts, the following edge cases were checked
-manually:
-
-* empty / missing input files, and malformed JSON in either input file
-  (must fail with a clear message, not a traceback)
-* prompts containing embedded double quotes (e.g. `Replace all numbers in
-  "Hello 34 I'm 233 years old" with NUMBERS`)
-* string values that must themselves contain a literal `"` or `\` character
-  once generated - `generate_string_value` scans for an *unescaped* closing
-  quote and JSON-unescapes the collected buffer, so `\"`, `\\`, `\n`, `\t`
-  inside a value round-trip correctly instead of truncating the string early
-* multi-parameter functions where an earlier string parameter is echoed back
-  into the context for later parameters (`_param_context` now builds that
-  context with `json.dumps`, so control characters are escaped correctly)
-* a value typed `"integer"` where the model's constrained number output is
-  not a whole number (rounded instead of discarded)
+* empty/missing/malformed input files (must fail clearly, not crash)
+* prompts with embedded double quotes
+* string values containing literal `"`/`\` once generated
+* multi-parameter functions where an earlier string parameter is echoed into later context
+* an `"integer"` parameter whose constrained number output isn't a whole number
+* an extremely large/scientific-notation number (output must never contain `Infinity`/`NaN`)
+* an unsupported or misspelled parameter type in `functions_definition.json`
 
 ```bash
-make run           # full end-to-end run, then inspect the output file
+make run   # full end-to-end run, then inspect the output file
 ```
 
 ## Example usage
 
 ```bash
-# Default paths
-uv run python -m src
+uv run python -m src   # default paths
 
-# Custom paths
 uv run python -m src \
   --functions_definition data/input/functions_definition.json \
   --input               data/input/function_calling_tests.json \
   --output              data/output/my_results.json
 ```
-
-Example output entry:
 
 ```json
 {
@@ -183,13 +131,23 @@ Example output entry:
 }
 ```
 
+A failed prompt still keeps exactly the same 3 keys instead of crashing or adding extra ones:
+
+```json
+{"prompt": "...", "name": "", "parameters": {}}
+```
+
+The reason is logged to stderr.
+
 ## Resources
 
 * Qwen3 model - https://huggingface.co/Qwen/Qwen3-0.6B
-* Pydantic v2 - https://docs.pydantic.dev/latest/
 * BPE tokenization - https://huggingface.co/learn/nlp-course/chapter6/5
 * Constrained decoding overview - https://arxiv.org/abs/2407.09809
+* Blog post on constrained decoding - https://www.aidancooper.co.uk/constrained-decoding/
 * JSON schema spec - https://json-schema.org/
 
 **AI usage** - GitHub Copilot was used to help design and implement the
-constrained decoding logic. It has been especially helpful to comprehend and implement correctly the token cache logic and memoization. It was also used to help write and format this README.md file.
+constrained decoding logic. It has been especially helpful to comprehend and
+implement correctly the token cache logic and memoization. It also has been
+used to help write and format this README.md file.
