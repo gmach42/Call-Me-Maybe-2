@@ -58,6 +58,17 @@ def load_json_file(path: Path) -> Any:
         raise ValueError(f"Invalid JSON in {path}: {exc}") from exc
 
 
+def _format_errors(exc: ValidationError) -> str:
+    """Render a ValidationError as one indented line per error."""
+    lines = []
+    for err in exc.errors(include_url=False, include_context=False):
+        loc = ".".join(str(p) for p in err["loc"])
+        msg = err["msg"].removeprefix("Value error, ")
+        prefix = f"{loc}: " if loc else ""
+        lines.append(f"  {prefix}{msg}")
+    return "\n" + "\n".join(lines)
+
+
 def _validate_items(
     raw: list[Any], model: type[ModelT], path: Path
 ) -> list[ModelT]:
@@ -67,8 +78,8 @@ def _validate_items(
         try:
             items.append(model.model_validate(entry))
         except ValidationError as exc:
-            print(f"Skipping invalid entry #{i} in {path}: {exc}",
-                  file=sys.stderr)
+            print(f"Skipping invalid entry #{i} in {path}:"
+                  f"{_format_errors(exc)}", file=sys.stderr)
     return items
 
 
@@ -90,7 +101,8 @@ def load_functions(path: Path) -> list[FunctionDefinition]:
             functions.append(FunctionDefinition.model_validate(entry))
         except ValidationError as exc:
             raise ValueError(
-                f"Invalid function definition #{i} in {path}: {exc}"
+                f"Invalid function definition #{i} in {path}:"
+                f"{_format_errors(exc)}"
             ) from exc
     return functions
 
