@@ -43,7 +43,20 @@ def generate_function_name(
     input_ids: list[int],
     functions: list[FunctionDefinition],
 ) -> str:
-    """Select a function name via constrained decoding."""
+    """Select a function name via constrained decoding.
+
+    Requires a non-empty `functions` list. Given that, the loop below
+    always returns via an exact match: `next_id` is always drawn from
+    `valid_ids`, so `active` can never become empty before a full match
+    is found. The two raises below guard states that should therefore
+    be unreachable, rather than silently decoding a name that matches
+    none of `functions`.
+    """
+    if not functions:
+        raise ValueError(
+            "generate_function_name requires a non-empty functions list"
+        )
+
     fn_seqs: list[tuple[str, list[int]]] = [
         (fn.name, model.encode(fn.name)[0].tolist()) for fn in functions
     ]
@@ -65,7 +78,10 @@ def generate_function_name(
         }
 
         if not valid_ids:
-            break
+            raise RuntimeError(
+                "generate_function_name: runtime error, no valid "
+                "next token for any active candidate"
+            )
 
         logits = model.get_logits_from_input_ids(ctx)
         next_id = max(valid_ids, key=lambda t: logits[t])
@@ -78,7 +94,10 @@ def generate_function_name(
             if pos < len(fn_seqs[i][1]) and fn_seqs[i][1][pos] == next_id
         ]
 
-    return model.decode(generated)
+    raise RuntimeError(
+        "generate_function_name: runtime error, no function name matched the "
+        "generated token sequence within the maximum allowed steps"
+    )
 
 
 def generate_number_value(
@@ -86,14 +105,25 @@ def generate_number_value(
     input_ids: list[int],
     cache: dict[int, str],
 ) -> float:
-    """Generate a number value via constrained decoding."""
+    """Generate a number value via constrained decoding.
+
+    Raises:
+        ValueError: If no valid number can be generated, or if the
+            generated number is not finite (e.g. 1e9999999).
+    """
     ctx: list[int] = list(input_ids)
     raw = ""
 
     for _ in range(MAX_NUM_STEPS):
         logits = model.get_logits_from_input_ids(ctx)
         arr = np.array(logits, dtype=np.float32)
-        top_ids: list[int] = np.argsort(arr)[-TOP_K:][::-1].tolist()
+
+        # argsort -> weakest first
+        ascending_by_logit = np.argsort(arr)
+        # flip -> strongest first
+        descending_by_logit = np.flip(ascending_by_logit)
+        # keep the TOP_K best tokens (index 0 of top_ids is the best)
+        top_ids: list[int] = descending_by_logit[:TOP_K].tolist()
 
         greedy_str = _token(model, int(top_ids[0]), cache).strip()
 
@@ -121,10 +151,17 @@ def generate_number_value(
         raw += _token(model, best_num_id, cache).strip()
         ctx.append(best_num_id)
 
+    if not raw:
+        raise ValueError("No valid number could be generated")
+
     try:
-        return float(raw) if raw else 0.0
-    except ValueError:
-        return 0.0
+        value = float(raw)
+    except ValueError as exc:
+        raise ValueError(f"Generated number is not valid: {raw!r}") from exc
+
+    if math.isinf(value) or math.isnan(value):
+        raise ValueError(f"Generated number is not finite: {raw!r}")
+    return value
 
 
 def generate_integer_value(
@@ -134,15 +171,9 @@ def generate_integer_value(
 ) -> int:
     """Generate an integer value via constrained decoding.
 
-    A number long enough to overflow a float (e.g. 300+ digits) parses
-    to `inf` without raising, but `round(inf)` raises OverflowError.
-    Guard against that so an oversized generation degrades to 0
-    instead of crashing this prompt's processing.
-    """
-    num = generate_number_value(model, input_ids, cache)
-    if math.isinf(num) or math.isnan(num):
-        return 0
-    return round(num)
+    We are just using generate_number_value and rounding to the nearest
+    integer"""
+    return round(generate_number_value(model, input_ids, cache))
 
 
 def generate_string_value(
@@ -152,10 +183,10 @@ def generate_string_value(
 ) -> str:
     """Generate a string value via constrained decoding.
 
-    Args:
-        model: The LLM model to use for constrained decoding.
-        input_ids: The list of input token IDs to start from.
-        cache: A dictionary to cache token ID to string mappings.
+    Raises:
+        ValueError: If the closing quote isn't reached within
+            MAX_STR_STEPS, or the generated content isn't valid JSON
+            once closed (e.g. a malformed escape sequence).
     """
     ctx: list[int] = list(input_ids)
     json_content = ""
@@ -186,12 +217,18 @@ def generate_string_value(
         json_content += best_str
         ctx.append(best_id)
 
-    if closed:
-        try:
-            return str(json.loads(f'"{json_content}"'))
-        except json.JSONDecodeError:
-            return json_content
-    return json_content
+    if not closed:
+        raise ValueError(
+            f"Generated string was not closed within {MAX_STR_STEPS} "
+            f"steps: {json_content!r}"
+        )
+
+    try:
+        return str(json.loads(f'"{json_content}"'))
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"Generated string is not valid JSON: {json_content!r}"
+        ) from exc
 
 
 def generate_bool_value(
@@ -202,7 +239,13 @@ def generate_bool_value(
     """Generate a boolean value via constrained decoding."""
     logits = model.get_logits_from_input_ids(input_ids)
     arr = np.array(logits, dtype=np.float32)
-    top_ids: list[int] = np.argsort(arr)[-TOP_K:][::-1].tolist()
+
+    # argsort -> weakest first
+    ascending_by_logit = np.argsort(arr)
+    # flip -> strongest first
+    descending_by_logit = np.flip(ascending_by_logit)
+    # keep the TOP_K best tokens (index 0 of top_ids is the best)
+    top_ids: list[int] = descending_by_logit[:TOP_K].tolist()
 
     best_true = NEGINF
     best_false = NEGINF
