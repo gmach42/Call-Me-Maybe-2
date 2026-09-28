@@ -93,8 +93,6 @@ All generators share a `dict[int, str]` decode cache so each token ID is decoded
 * **Prompt engineering** - a short, direct pre-prompt beat more elaborate ones.
 * **Regex patterns** - used to detect when a sequence of tokens together forms a valid number.
 * **Numeric overflow -> invalid JSON** - a huge/scientific-notation number can silently overflow `float()` to `inf`, which `json.dump` would render as the invalid token `Infinity` (RFC 8259 doesn't allow it). Fixed with an explicit `isinf`/`isnan` check, plus `allow_nan=False` as a last resort.
-* **Unnoticed unsupported types** - `type` was originally a free string, so a typo or unknown type would pass validation and silently yield `None`. Fixed by restricting it to a `Literal` of supported types.
-* **Silent fallbacks hiding failures** - some "shouldn't happen" fallback paths (default `0.0`, truncated strings, unmatched names) turned out reachable or misleading. Replaced with explicit, descriptive errors caught once at the pipeline level.
 
 ## Testing strategy
 
