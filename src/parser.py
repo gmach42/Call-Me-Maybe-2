@@ -59,7 +59,7 @@ def load_json_file(path: Path) -> Any:
 
 
 def _format_errors(exc: ValidationError) -> str:
-    """Render a ValidationError as one indented line per error."""
+    """Function to format Pydantic validation errors for display."""
     lines = []
     for err in exc.errors(include_url=False, include_context=False):
         loc = ".".join(str(p) for p in err["loc"])
