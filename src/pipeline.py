@@ -140,7 +140,8 @@ def run(
             print(f"  Error: {exc}", file=sys.stderr)
             results.append({
                 "prompt": item.prompt,
-                "error": str(exc),
+                "name": "",
+                "parameters": {}
             })
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
