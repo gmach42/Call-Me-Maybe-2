@@ -41,7 +41,11 @@ def main() -> None:
         print(f"Error loading model: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    run(model, prompts, functions, args.output)
+    try:
+        run(model, prompts, functions, args.output)
+    except (OSError, ValueError) as exc:
+        print(f"Error writing output: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     end_time = time.time()
     print(f"Execution time: {end_time - start_time:.1f} seconds\n",
