@@ -1,7 +1,7 @@
 """Constrained decoding utilities.
 
-All generation is done token-by-token. Invalid tokens are excluded by
-masking logits to -inf.
+All generation is done token-by-token. Most generators restrict each step
+to valid candidate tokens and pick the highest-logit one among them.
 """
 
 import json
@@ -45,12 +45,14 @@ def generate_function_name(
 ) -> str:
     """Select a function name via constrained decoding.
 
-    Requires a non-empty `functions` list. Given that, the loop below
-    always returns via an exact match: `next_id` is always drawn from
-    `valid_ids`, so `active` can never become empty before a full match
-    is found. The two raises below guard states that should therefore
-    be unreachable, rather than silently decoding a name that matches
-    none of `functions`.
+    Sequentially generates tokens, masking out any that would not match
+    the next token of any of the candidate function names. Stops when a
+    complete function name is generated.
+
+    Raises:
+        ValueError: If the functions list is empty.
+        RuntimeError: If no function name can be generated within the
+            maximum allowed steps.
     """
     if not functions:
         raise ValueError(
@@ -169,10 +171,7 @@ def generate_integer_value(
     input_ids: list[int],
     cache: dict[int, str],
 ) -> int:
-    """Generate an integer value via constrained decoding.
-
-    We are just using generate_number_value and rounding to the nearest
-    integer"""
+    """Generate an integer value via constrained decoding."""
     return round(generate_number_value(model, input_ids, cache))
 
 

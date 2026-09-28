@@ -3,10 +3,6 @@
 from pydantic import BaseModel, field_validator, model_validator
 from typing import Any, Literal, get_args
 
-# The types actually handled by constrained_decoding.generate_value().
-# Both python-style ("int", "str", ...) and JSON-schema-style
-# ("integer", "string", ...) spellings are accepted, since
-# functions_definition.json may use either.
 SUPPORTED_TYPES = Literal[
     "int", "integer", "float", "number", "str", "string", "bool", "boolean",
 ]
