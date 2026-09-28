@@ -1,48 +1,31 @@
 """Pydantic models shared across the pipeline: prompts, functions, results."""
 
-from enum import Enum
 from pydantic import BaseModel, field_validator, model_validator
-from typing import Any
+from typing import Any, Literal, get_args
 
-
-class ParamType(str, Enum):
-    """The 4 types actually handled by constrained_decoding.generate_value().
-
-    Both python-style ("int", "str", ...) and JSON-schema-style
-    ("integer", "string", ...) spellings are accepted, since
-    functions_definition.json may use either.
-    """
-
-    INT = "int"
-    INTEGER = "integer"
-    FLOAT = "float"
-    NUMBER = "number"
-    STR = "str"
-    STRING = "string"
-    BOOL = "bool"
-    BOOLEAN = "boolean"
-
-    def __str__(self) -> str:
-        # Without this, str(ParamType.INT) is "ParamType.INT" (Enum's
-        # default), which would leak into the prompt text built in
-        # pipeline._base_prompt() via f"{k}: {v.type}".
-        return self.value
+# The types actually handled by constrained_decoding.generate_value().
+# Both python-style ("int", "str", ...) and JSON-schema-style
+# ("integer", "string", ...) spellings are accepted, since
+# functions_definition.json may use either.
+SUPPORTED_TYPES = Literal[
+    "int", "integer", "float", "number", "str", "string", "bool", "boolean",
+]
 
 
 class PromptItem(BaseModel):
-    """A single natural-language prompt from the input file."""
+    """Pydantic model of a single natural-language prompt."""
 
     prompt: str
 
 
 class FunctionParameter(BaseModel):
-    """Describes one parameter of a function (its JSON type)."""
+    """Pydantic model describing one parameter of a function."""
 
-    type: ParamType
+    type: SUPPORTED_TYPES
 
 
 class FunctionDefinition(BaseModel):
-    """Full definition of a callable function."""
+    """Pydantic model of a full definition of a callable function."""
 
     name: str
     description: str
@@ -52,6 +35,7 @@ class FunctionDefinition(BaseModel):
     @field_validator("name")
     @classmethod
     def name_not_empty(cls, v: str) -> str:
+        """Reject a blank or whitespace-only function name."""
         if not v.strip():
             raise ValueError("Function 'name' must not be empty")
         return v
@@ -59,6 +43,7 @@ class FunctionDefinition(BaseModel):
     @field_validator("description")
     @classmethod
     def description_not_empty(cls, v: str) -> str:
+        """Reject a blank or whitespace-only function description."""
         if not v.strip():
             raise ValueError("Function 'description' must not be empty")
         return v
@@ -66,19 +51,19 @@ class FunctionDefinition(BaseModel):
     @field_validator("returns")
     @classmethod
     def returns_type_is_supported(cls, v: dict[str, Any]) -> dict[str, Any]:
+        """Reject a 'returns' dict missing a supported 'type'."""
         if "type" not in v:
             raise ValueError("Function 'returns' must specify a 'type'")
-        try:
-            ParamType(v["type"])
-        except ValueError:
+        if v["type"] not in get_args(SUPPORTED_TYPES):
             raise ValueError(
                 f"Unsupported return type {v['type']!r}: must be one of "
                 "int, number, str or bool"
-            ) from None
+            )
         return v
 
     @model_validator(mode="after")
     def parameters_not_blank(self) -> "FunctionDefinition":
+        """Reject any parameter with a blank or whitespace-only name."""
         for param_name in self.parameters:
             if not param_name.strip():
                 raise ValueError("Parameter names must not be empty")
@@ -86,7 +71,7 @@ class FunctionDefinition(BaseModel):
 
 
 class FunctionCallResult(BaseModel):
-    """Result of processing one prompt: chosen function + extracted args."""
+    """Pydantic model of the result of processing one prompt."""
 
     prompt: str
     name: str
