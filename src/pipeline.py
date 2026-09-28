@@ -140,12 +140,11 @@ def run(
             print(f"  Error: {exc}", file=sys.stderr)
             results.append({
                 "prompt": item.prompt,
-                "name": "",
-                "parameters": {}
+                "error": str(exc),
             })
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as fh:
-        json.dump(results, fh, indent=2, ensure_ascii=False)
+        json.dump(results, fh, indent=2, ensure_ascii=False, allow_nan=False)
 
     print(f"Output written to {output_path}", file=sys.stderr)
